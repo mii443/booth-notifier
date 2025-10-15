@@ -1,3 +1,4 @@
+mod booth;
 mod event_handler;
 
 use anyhow::Result;
