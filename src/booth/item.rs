@@ -1,4 +1,22 @@
+use anyhow::{Context, Result};
 use serde::Deserialize;
+
+impl BoothItem {
+    pub async fn from_id(id: u64) -> Result<Self> {
+        let url = format!("https://booth.pm/ja/items/{id}.json");
+        let client = reqwest::Client::new();
+        let resp = client
+            .get(&url)
+            .header("Accept", "application/json")
+            .send()
+            .await?;
+        let item: BoothItem = resp
+            .json()
+            .await
+            .with_context(|| format!("Failed to parse JSON from {url}"))?;
+        Ok(item)
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct BoothItem {
@@ -142,7 +160,7 @@ pub struct Variation {
     pub is_factory_item: bool,
     pub is_mailbin: bool,
     pub is_waiting_on_arrival: bool,
-    pub name: String,
+    pub name: Option<String>,
     pub order_url: Option<String>,
     pub price: i64,
     pub small_stock: Option<i64>,
