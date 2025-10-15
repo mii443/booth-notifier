@@ -1,19 +1,62 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result};
+use reqwest::{cookie::Jar, Client, Url};
+use scraper::{Html, Selector};
 use serde::Deserialize;
+
+fn get_client(url: &Url) -> Client {
+    let cookit_str = "adult=t;";
+    let cookies = Arc::new(Jar::default());
+    cookies.add_cookie_str(cookit_str, url);
+
+    let client_builder = reqwest::Client::builder();
+    let client: Client = client_builder.cookie_provider(cookies).build().unwrap();
+
+    client
+}
+
+pub async fn get_recent_item_ids() -> Result<Vec<u64>> {
+    let url = Url::parse(
+        "https://booth.pm/ja/items?adult=include&in_stock=true&sort=new&tags%5B%5D=VRChat",
+    )
+    .unwrap();
+    let client = get_client(&url);
+    let response = client.get(url).send().await?.text().await.unwrap();
+    let document = Html::parse_document(&response);
+
+    let selector = Selector::parse("li.item-card.l-card[data-product-id]").unwrap();
+
+    let elements = document.select(&selector);
+    let mut products = vec![];
+    for element in elements {
+        products.push(
+            element
+                .value()
+                .attr("data-product-id")
+                .unwrap()
+                .parse::<u64>()?,
+        );
+    }
+
+    products.reverse();
+    Ok(products)
+}
 
 impl BoothItem {
     pub async fn from_id(id: u64) -> Result<Self> {
         let url = format!("https://booth.pm/ja/items/{id}.json");
+        let client = get_client(&Url::parse(&url).unwrap());
         let client = reqwest::Client::new();
         let resp = client
             .get(&url)
             .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
             .send()
             .await?;
-        let item: BoothItem = resp
-            .json()
-            .await
-            .with_context(|| format!("Failed to parse JSON from {url}"))?;
+        let text = resp.text().await?;
+        let item: BoothItem = serde_json::from_str(&text)
+            .with_context(|| format!("Failed to parse JSON for item ID {}: {}", id, text))?;
         Ok(item)
     }
 }
@@ -45,7 +88,7 @@ pub struct BoothItem {
     pub category: Category,
 
     #[serde(default)]
-    pub embeds: Vec<Embed>,
+    pub embeds: Vec<serde_json::Value>,
 
     #[serde(default)]
     pub images: Vec<Image>,
@@ -88,12 +131,6 @@ pub struct Category {
 pub struct CategoryParent {
     pub name: String,
     pub url: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Embed {
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -140,6 +177,30 @@ pub struct TagCombination {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum Downloadable {
+    Flag(bool),
+    Detail(DownloadableDetail),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DownloadableDetail {
+    #[serde(default)]
+    pub musics: Vec<DownloadFile>,
+    #[serde(default)]
+    pub no_musics: Vec<DownloadFile>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DownloadFile {
+    pub file_name: String,
+    pub file_extension: String,
+    pub file_size: String,
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VariationType {
     Digital,
@@ -150,7 +211,7 @@ pub enum VariationType {
 #[derive(Debug, Deserialize)]
 pub struct Variation {
     pub buyee_html: Option<String>,
-    pub downloadable: Option<bool>,
+    pub downloadable: Option<Downloadable>,
     pub factory_image_url: Option<String>,
     pub has_download_code: bool,
     pub id: u64,
