@@ -2,7 +2,7 @@ mod booth;
 mod database;
 mod event_handler;
 mod filter;
-mod scraping_task;
+mod task;
 
 use anyhow::Result;
 use database::DatabaseClient;

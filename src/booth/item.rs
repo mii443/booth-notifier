@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use reqwest::{cookie::Jar, Client, Url};
 use scraper::{Html, Selector};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 fn get_client(url: &Url) -> Client {
     let cookit_str = "adult=t;";
@@ -61,7 +61,7 @@ impl BoothItem {
     }
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct BoothItem {
     pub description: String,
     pub factory_description: Option<String>,
@@ -113,13 +113,13 @@ pub struct BoothItem {
     pub variations: Vec<Variation>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BuyeeVariation {
     #[serde(flatten)]
     pub extra: serde_json::Value,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Category {
     pub id: u64,
     pub name: String,
@@ -127,27 +127,27 @@ pub struct Category {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct CategoryParent {
     pub name: String,
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Image {
     pub caption: Option<String>,
     pub original: String,
     pub resized: String,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Share {
     #[serde(default)]
     pub hashtags: Vec<String>,
     pub text: String,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Shop {
     pub name: String,
     pub subdomain: String,
@@ -156,34 +156,34 @@ pub struct Shop {
     pub verified: bool,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Tag {
     pub name: String,
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TagBanner {
     pub image_url: Option<String>,
     pub name: String,
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TagCombination {
     pub category: String,
     pub tag: String,
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Downloadable {
     Flag(bool),
     Detail(DownloadableDetail),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadableDetail {
     #[serde(default)]
     pub musics: Vec<DownloadFile>,
@@ -191,7 +191,7 @@ pub struct DownloadableDetail {
     pub no_musics: Vec<DownloadFile>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadFile {
     pub file_name: String,
     pub file_extension: String,
@@ -200,7 +200,7 @@ pub struct DownloadFile {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VariationType {
     Digital,
@@ -208,7 +208,7 @@ pub enum VariationType {
     Other,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Variation {
     pub buyee_html: Option<String>,
     pub downloadable: Option<Downloadable>,

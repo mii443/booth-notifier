@@ -216,6 +216,22 @@ impl DatabaseClient {
         Ok(guild)
     }
 
+    /// Get all Discord guilds
+    pub async fn get_all_discord_guilds(&self) -> Result<Vec<DiscordGuild>> {
+        let guilds = sqlx::query_as!(
+            DiscordGuild,
+            r#"
+            SELECT guild_id, name, created_at, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id
+            FROM discord_guilds
+            ORDER BY name
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(guilds)
+    }
+
     /// Insert or update a Discord channel
     pub async fn upsert_discord_channel(
         &self,
