@@ -61,7 +61,7 @@ impl BoothItem {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct BoothItem {
     pub description: String,
     pub factory_description: Option<String>,
@@ -119,7 +119,7 @@ pub struct BuyeeVariation {
     pub extra: serde_json::Value,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct Category {
     pub id: u64,
     pub name: String,
@@ -127,7 +127,7 @@ pub struct Category {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct CategoryParent {
     pub name: String,
     pub url: String,
@@ -140,14 +140,14 @@ pub struct Image {
     pub resized: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct Share {
     #[serde(default)]
     pub hashtags: Vec<String>,
     pub text: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct Shop {
     pub name: String,
     pub subdomain: String,
@@ -156,7 +156,7 @@ pub struct Shop {
     pub verified: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct Tag {
     pub name: String,
     pub url: String,

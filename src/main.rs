@@ -1,6 +1,7 @@
 mod booth;
 mod database;
 mod event_handler;
+mod filter;
 mod scraping_task;
 
 use anyhow::Result;

@@ -175,14 +175,23 @@ impl DatabaseClient {
         let guild = sqlx::query_as!(
             DiscordGuild,
             r#"
-            INSERT INTO discord_guilds (guild_id, name)
-            VALUES ($1, $2)
+            INSERT INTO discord_guilds (guild_id, name, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (guild_id)
-            DO UPDATE SET name = EXCLUDED.name
-            RETURNING guild_id, name, created_at
+            DO UPDATE SET
+                name = EXCLUDED.name,
+                fallback_channel_id = EXCLUDED.fallback_channel_id,
+                fallback_nsfw_channel_id = EXCLUDED.fallback_nsfw_channel_id,
+                general_category_id = EXCLUDED.general_category_id,
+                nsfw_category_id = EXCLUDED.nsfw_category_id
+            RETURNING guild_id, name, created_at, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id
             "#,
             new_guild.guild_id,
-            new_guild.name
+            new_guild.name,
+            new_guild.fallback_channel_id,
+            new_guild.fallback_nsfw_channel_id,
+            new_guild.general_category_id,
+            new_guild.nsfw_category_id
         )
         .fetch_one(&self.pool)
         .await?;
@@ -195,7 +204,7 @@ impl DatabaseClient {
         let guild = sqlx::query_as!(
             DiscordGuild,
             r#"
-            SELECT guild_id, name, created_at
+            SELECT guild_id, name, created_at, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id
             FROM discord_guilds
             WHERE guild_id = $1
             "#,
@@ -359,5 +368,38 @@ impl DatabaseClient {
         .await?;
 
         Ok(filters)
+    }
+
+    /// Update special channels configuration for a Discord guild
+    pub async fn update_guild_special_channels(
+        &self,
+        guild_id: i64,
+        fallback_channel_id: Option<i64>,
+        fallback_nsfw_channel_id: Option<i64>,
+        general_category_id: Option<i64>,
+        nsfw_category_id: Option<i64>,
+    ) -> Result<DiscordGuild> {
+        let guild = sqlx::query_as!(
+            DiscordGuild,
+            r#"
+            UPDATE discord_guilds
+            SET
+                fallback_channel_id = $2,
+                fallback_nsfw_channel_id = $3,
+                general_category_id = $4,
+                nsfw_category_id = $5
+            WHERE guild_id = $1
+            RETURNING guild_id, name, created_at, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id
+            "#,
+            guild_id,
+            fallback_channel_id,
+            fallback_nsfw_channel_id,
+            general_category_id,
+            nsfw_category_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(guild)
     }
 }

@@ -26,6 +26,10 @@ pub struct DiscordGuild {
     pub guild_id: i64,
     pub name: String,
     pub created_at: OffsetDateTime,
+    pub fallback_channel_id: Option<i64>,
+    pub fallback_nsfw_channel_id: Option<i64>,
+    pub general_category_id: Option<i64>,
+    pub nsfw_category_id: Option<i64>,
 }
 
 /// A notification filter rule stored as YAML
@@ -65,6 +69,10 @@ pub struct NewItemSnapshot {
 pub struct NewDiscordGuild {
     pub guild_id: i64,
     pub name: String,
+    pub fallback_channel_id: Option<i64>,
+    pub fallback_nsfw_channel_id: Option<i64>,
+    pub general_category_id: Option<i64>,
+    pub nsfw_category_id: Option<i64>,
 }
 
 /// Input struct for creating a new notification filter
