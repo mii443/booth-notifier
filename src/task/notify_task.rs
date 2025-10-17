@@ -1,7 +1,7 @@
 use anyhow::Result;
 use poise::serenity_prelude::{self as serenity, CacheHttp, ChannelId, CreateEmbed, CreateMessage};
 use std::collections::HashMap;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     booth::item::BoothItem,
@@ -66,6 +66,8 @@ impl NotifyTask {
             );
             self.notify_to_fallback_channel(ctx, guild, item).await?;
         }
+
+        info!("Finished processing items for guild '{}'", guild.guild_id);
 
         Ok(())
     }
@@ -138,14 +140,28 @@ impl NotifyTask {
         channel: ChannelId,
         message: CreateMessage,
     ) -> Result<()> {
+        info!("Sending message to channel {}", channel.get());
         let message = channel.send_message(&ctx.http(), message).await?;
-        message.crosspost(&ctx.http()).await?;
+
+        tokio::spawn({
+            let message = message.clone();
+            let ctx = ctx.clone();
+            async move {
+                if let Err(e) = message.crosspost(&ctx.http()).await {
+                    error!("Failed to crosspost message: {}", e);
+                }
+                info!("Message crossposted to channel {}", channel.get());
+            }
+        });
+
+        info!("Message sent to channel {}", channel.get());
 
         Ok(())
     }
 
     async fn is_nsfw_channel(&mut self, ctx: &serenity::Context, channel_id: i64) -> Result<bool> {
         if let Some(is_nsfw) = self.nsfw_cache.get(&channel_id) {
+            info!("NSFW cache hit for channel {}: {}", channel_id, is_nsfw);
             return Ok(*is_nsfw);
         }
 
@@ -160,6 +176,7 @@ impl NotifyTask {
 
         self.nsfw_cache.insert(channel_id, is_nsfw);
 
+        info!("NSFW cache miss for channel {}: {}", channel_id, is_nsfw);
         Ok(is_nsfw)
     }
 
