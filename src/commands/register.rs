@@ -16,13 +16,21 @@ pub async fn register_server(
     sfw_fallback_id: String,
     nsfw_fallback_id: String,
 ) -> Result<(), Error> {
-    let sfw_category_id: u64 = sfw_category_id.parse().unwrap();
-    let nsfw_category_id: u64 = nsfw_category_id.parse().unwrap();
-    let sfw_fallback_id: u64 = sfw_fallback_id.parse().unwrap();
-    let nsfw_fallback_id: u64 = nsfw_fallback_id.parse().unwrap();
+    let sfw_category_id: u64 = sfw_category_id.parse().map_err(|_| {
+        "Invalid sfw_category_id: must be a valid number"
+    })?;
+    let nsfw_category_id: u64 = nsfw_category_id.parse().map_err(|_| {
+        "Invalid nsfw_category_id: must be a valid number"
+    })?;
+    let sfw_fallback_id: u64 = sfw_fallback_id.parse().map_err(|_| {
+        "Invalid sfw_fallback_id: must be a valid number"
+    })?;
+    let nsfw_fallback_id: u64 = nsfw_fallback_id.parse().map_err(|_| {
+        "Invalid nsfw_fallback_id: must be a valid number"
+    })?;
 
     let db = ctx.data().db.clone();
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx.guild_id().ok_or("This command must be used in a guild")?;
 
     let new_guild = NewDiscordGuild {
         guild_id: guild_id.get() as i64,

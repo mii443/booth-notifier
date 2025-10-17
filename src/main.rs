@@ -38,8 +38,9 @@ async fn main() -> Result<()> {
     let database_url = std::env::var("DATABASE_URL")?;
     let owners = std::env::var("BOT_OWNERS")?
         .split(',')
-        .map(|s| s.parse().unwrap())
-        .collect::<std::collections::HashSet<_>>();
+        .map(|s| s.parse())
+        .collect::<Result<std::collections::HashSet<_>, _>>()
+        .map_err(|e| anyhow::anyhow!("Failed to parse BOT_OWNERS: {}", e))?;
     let prefix = std::env::var("BOT_PREFIX").unwrap_or_else(|_| "!".to_string());
 
     // Initialize database client

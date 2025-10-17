@@ -68,16 +68,14 @@ pub async fn add(
         });
     }
 
-    let guild_id = ctx.guild_id().unwrap();
+    let guild_id = ctx.guild_id().ok_or("This command must be used in a guild")?;
     let db_guild = db.get_discord_guild(guild_id.get() as i64).await?;
 
-    if db_guild.is_none() {
+    let Some(db_guild) = db_guild else {
         ctx.say("This guild is not registered. Please register the guild first.")
             .await?;
         return Ok(());
-    }
-
-    let db_guild = db_guild.unwrap();
+    };
 
     let general_category = if let Some(id) = db_guild.general_category_id {
         id

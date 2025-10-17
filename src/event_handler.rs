@@ -1,5 +1,5 @@
 use poise::serenity_prelude::{self as serenity, FullEvent};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     task::{NotifyTask, ScrapingTask},
@@ -46,12 +46,17 @@ async fn ready_handler(
         let notify_task = NotifyTask::new();
 
         loop {
-            let items = scraping_task.run(&database_client).await.unwrap();
+            let items = match scraping_task.run(&database_client).await {
+                Ok(items) => items,
+                Err(e) => {
+                    error!("Error during scraping task: {:?}", e);
+                    vec![]
+                }
+            };
 
-            notify_task
-                .notify(&ctx, &database_client, &items)
-                .await
-                .unwrap();
+            if let Err(e) = notify_task.notify(&ctx, &database_client, &items).await {
+                error!("Error during notify task: {:?}", e);
+            }
 
             tokio::time::sleep(check_interval).await;
         }

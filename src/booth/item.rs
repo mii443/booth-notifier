@@ -5,38 +5,40 @@ use reqwest::{cookie::Jar, Client, Url};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 
-fn get_client(url: &Url) -> Client {
+fn get_client(url: &Url) -> Result<Client> {
     let cookit_str = "adult=t;";
     let cookies = Arc::new(Jar::default());
     cookies.add_cookie_str(cookit_str, url);
 
     let client_builder = reqwest::Client::builder();
-    let client: Client = client_builder.cookie_provider(cookies).build().unwrap();
+    let client: Client = client_builder
+        .cookie_provider(cookies)
+        .build()
+        .context("Failed to build HTTP client")?;
 
-    client
+    Ok(client)
 }
 
 pub async fn get_recent_item_ids() -> Result<Vec<u64>> {
     let url = Url::parse(
         "https://booth.pm/ja/items?adult=include&in_stock=true&sort=new&tags%5B%5D=VRChat",
     )
-    .unwrap();
-    let client = get_client(&url);
-    let response = client.get(url).send().await?.text().await.unwrap();
+    .context("Failed to parse URL")?;
+    let client = get_client(&url)?;
+    let response = client.get(url).send().await?.text().await
+        .context("Failed to get response text")?;
     let document = Html::parse_document(&response);
 
-    let selector = Selector::parse("li.item-card.l-card[data-product-id]").unwrap();
+    let selector = Selector::parse("li.item-card.l-card[data-product-id]")
+        .map_err(|e| anyhow::anyhow!("Failed to parse selector: {:?}", e))?;
 
     let elements = document.select(&selector);
     let mut products = vec![];
     for element in elements {
-        products.push(
-            element
-                .value()
-                .attr("data-product-id")
-                .unwrap()
-                .parse::<u64>()?,
-        );
+        if let Some(product_id) = element.value().attr("data-product-id") {
+            products.push(product_id.parse::<u64>()
+                .context(format!("Failed to parse product ID: {}", product_id))?);
+        }
     }
 
     products.reverse();
@@ -46,7 +48,6 @@ pub async fn get_recent_item_ids() -> Result<Vec<u64>> {
 impl BoothItem {
     pub async fn from_id(id: u64) -> Result<Self> {
         let url = format!("https://booth.pm/ja/items/{id}.json");
-        let client = get_client(&Url::parse(&url).unwrap());
         let client = reqwest::Client::new();
         let resp = client
             .get(&url)

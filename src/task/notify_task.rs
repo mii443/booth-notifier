@@ -84,12 +84,12 @@ impl NotifyTask {
         channel: &DiscordChannel,
         item: &BoothItem,
     ) -> Result<bool> {
-        if channel.filter_id.is_none() {
+        let Some(filter_id) = channel.filter_id else {
             return Ok(false);
-        }
+        };
 
         let filter: Filter = if let Some(filter) = db
-            .get_notification_filter(channel.filter_id.unwrap())
+            .get_notification_filter(filter_id)
             .await?
         {
             if let Ok(filter) = serde_yaml::from_str(&filter.rule_yaml) {
