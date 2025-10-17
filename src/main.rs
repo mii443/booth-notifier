@@ -1,4 +1,5 @@
 mod booth;
+mod commands;
 mod database;
 mod event_handler;
 mod filter;
@@ -7,8 +8,13 @@ mod task;
 use anyhow::Result;
 use database::DatabaseClient;
 use event_handler::event_handler;
-use poise::serenity_prelude::{self as serenity};
+use poise::{
+    serenity_prelude::{self as serenity},
+    PrefixFrameworkOptions,
+};
 use tracing::info;
+
+use crate::commands::{avatar::avatar_command, register::register};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -31,6 +37,7 @@ async fn main() -> Result<()> {
         .split(',')
         .map(|s| s.parse().unwrap())
         .collect::<std::collections::HashSet<_>>();
+    let prefix = std::env::var("BOT_PREFIX").unwrap_or_else(|_| "!".to_string());
 
     // Initialize database client
     let db = DatabaseClient::new(&database_url).await?;
@@ -47,14 +54,21 @@ async fn main() -> Result<()> {
                 Box::pin(event_handler(ctx, event, framework, data))
             },
             owners,
+            commands: vec![avatar_command(), register()],
+            prefix_options: PrefixFrameworkOptions {
+                prefix: Some(prefix),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .build();
 
-    let mut client =
-        serenity::ClientBuilder::new(token, serenity::GatewayIntents::non_privileged())
-            .framework(framework)
-            .await?;
+    let mut client = serenity::ClientBuilder::new(
+        token,
+        serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT,
+    )
+    .framework(framework)
+    .await?;
 
     client.start().await?;
 

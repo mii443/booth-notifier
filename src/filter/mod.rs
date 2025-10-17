@@ -4,7 +4,7 @@ pub use engine::*;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Filter {
     #[serde(default)]
     pub groups: Vec<FilterGroup>,
