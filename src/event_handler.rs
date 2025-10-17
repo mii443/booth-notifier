@@ -43,7 +43,7 @@ async fn ready_handler(
         let fetch_interval = std::time::Duration::from_millis(fetch_interval);
 
         let mut scraping_task = ScrapingTask::new(fetch_interval);
-        let notify_task = NotifyTask::new();
+        let mut notify_task = NotifyTask::new();
 
         loop {
             let items = match scraping_task.run(&database_client).await {

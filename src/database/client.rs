@@ -2,6 +2,7 @@ use anyhow::Result;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::types::time::OffsetDateTime;
 use sqlx::types::JsonValue;
+use std::collections::HashMap;
 
 use super::models::{
     DiscordChannel, DiscordGuild, FetchRun, ItemSnapshot, NewDiscordChannel, NewDiscordGuild,
@@ -384,6 +385,31 @@ impl DatabaseClient {
         .await?;
 
         Ok(filters)
+    }
+
+    /// Get multiple notification filters by IDs in a single query
+    /// Returns a HashMap mapping filter ID to NotificationFilter for efficient lookups
+    pub async fn get_notification_filters_by_ids(
+        &self,
+        ids: &[i64],
+    ) -> Result<HashMap<i64, NotificationFilter>> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let filters = sqlx::query_as!(
+            NotificationFilter,
+            r#"
+            SELECT id, rule_yaml, created_at
+            FROM notification_filters
+            WHERE id = ANY($1)
+            "#,
+            ids
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(filters.into_iter().map(|f| (f.id, f)).collect())
     }
 
     /// Update special channels configuration for a Discord guild
