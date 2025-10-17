@@ -14,7 +14,10 @@ use poise::{
 };
 use tracing::info;
 
-use crate::commands::{avatar::avatar_command, register::register};
+use crate::commands::{
+    avatar::avatar_command,
+    register::{register, register_server},
+};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -54,7 +57,7 @@ async fn main() -> Result<()> {
                 Box::pin(event_handler(ctx, event, framework, data))
             },
             owners,
-            commands: vec![avatar_command(), register()],
+            commands: vec![avatar_command(), register(), register_server()],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(prefix),
                 ..Default::default()
