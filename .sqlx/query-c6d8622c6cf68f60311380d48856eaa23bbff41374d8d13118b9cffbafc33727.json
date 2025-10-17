@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT guild_id, name, created_at, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id\n            FROM discord_guilds\n            ORDER BY name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "guild_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "fallback_channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "fallback_nsfw_channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "general_category_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "nsfw_category_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "c6d8622c6cf68f60311380d48856eaa23bbff41374d8d13118b9cffbafc33727"
+}

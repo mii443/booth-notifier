@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE discord_guilds\n            SET\n                fallback_channel_id = $2,\n                fallback_nsfw_channel_id = $3,\n                general_category_id = $4,\n                nsfw_category_id = $5\n            WHERE guild_id = $1\n            RETURNING guild_id, name, created_at, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "guild_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "fallback_channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "fallback_nsfw_channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "general_category_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "nsfw_category_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "052dec3430b48d4459041434ded790a366b2e9b9a6ec4cea8253cde2af49c1c0"
+}

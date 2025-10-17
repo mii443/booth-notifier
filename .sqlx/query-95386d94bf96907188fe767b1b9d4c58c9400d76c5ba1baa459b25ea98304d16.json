@@ -1,0 +1,49 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO discord_channels (channel_id, guild_id, name, filter_id)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (channel_id)\n            DO UPDATE SET\n                guild_id = EXCLUDED.guild_id,\n                name = EXCLUDED.name,\n                filter_id = EXCLUDED.filter_id\n            RETURNING channel_id, guild_id, name, created_at, filter_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "guild_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "filter_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "95386d94bf96907188fe767b1b9d4c58c9400d76c5ba1baa459b25ea98304d16"
+}

@@ -1,0 +1,63 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO discord_guilds (guild_id, name, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (guild_id)\n            DO UPDATE SET\n                name = EXCLUDED.name,\n                fallback_channel_id = EXCLUDED.fallback_channel_id,\n                fallback_nsfw_channel_id = EXCLUDED.fallback_nsfw_channel_id,\n                general_category_id = EXCLUDED.general_category_id,\n                nsfw_category_id = EXCLUDED.nsfw_category_id\n            RETURNING guild_id, name, created_at, fallback_channel_id, fallback_nsfw_channel_id, general_category_id, nsfw_category_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "guild_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "fallback_channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "fallback_nsfw_channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "general_category_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "nsfw_category_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "0621e24d9ad92c8ae6b10313b30a00fc9c3eea92295ab2bb1f2bfc799afbbb79"
+}
