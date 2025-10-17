@@ -11,11 +11,16 @@ pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, guild_only, owners_only)]
 pub async fn register_server(
     ctx: Context<'_>,
-    sfw_category_id: u64,
-    nsfw_category_id: u64,
-    sfw_fallback_id: u64,
-    nsfw_fallback_id: u64,
+    sfw_category_id: String,
+    nsfw_category_id: String,
+    sfw_fallback_id: String,
+    nsfw_fallback_id: String,
 ) -> Result<(), Error> {
+    let sfw_category_id: u64 = sfw_category_id.parse().unwrap();
+    let nsfw_category_id: u64 = nsfw_category_id.parse().unwrap();
+    let sfw_fallback_id: u64 = sfw_fallback_id.parse().unwrap();
+    let nsfw_fallback_id: u64 = nsfw_fallback_id.parse().unwrap();
+
     let db = ctx.data().db.clone();
     let guild_id = ctx.guild_id().unwrap();
 
