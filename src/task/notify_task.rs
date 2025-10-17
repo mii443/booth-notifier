@@ -1,6 +1,6 @@
 use anyhow::Result;
 use poise::serenity_prelude::{
-    self as serenity, CacheHttp, ChannelId, CreateMessage, GuildChannel, GuildId,
+    self as serenity, CacheHttp, ChannelId, CreateEmbed, CreateMessage, GuildChannel, GuildId,
 };
 
 use crate::{
@@ -69,12 +69,9 @@ impl NotifyTask {
         };
 
         if let Some(channel_id) = fallback_channel_id {
-            ChannelId::new(channel_id as u64)
-                .send_message(
-                    &ctx.http(),
-                    CreateMessage::new().content(format!("{}\n{}", item.name, item.url)),
-                )
-                .await?;
+            let channel_id = ChannelId::new(channel_id as u64);
+            let message = self.create_message(item);
+            self.send_message(ctx, channel_id, message).await?;
         }
 
         Ok(())
@@ -117,15 +114,48 @@ impl NotifyTask {
         }
 
         if engine.check(item) {
-            channel_id
-                .send_message(
-                    &ctx.http(),
-                    CreateMessage::new().content(format!("{}\n{}", item.name, item.url)),
-                )
-                .await?;
+            let message = self.create_message(item);
+            self.send_message(ctx, channel_id, message).await?;
+
             Ok(true)
         } else {
             Ok(false)
         }
+    }
+
+    async fn send_message(
+        &self,
+        ctx: &serenity::Context,
+        channel: ChannelId,
+        message: CreateMessage,
+    ) -> Result<()> {
+        let message = channel.send_message(&ctx.http(), message).await?;
+        message.crosspost(&ctx.http()).await?;
+
+        Ok(())
+    }
+
+    fn create_message(&self, item: &BoothItem) -> CreateMessage {
+        CreateMessage::new().embed({
+            let mut embed = CreateEmbed::new()
+                .title(item.name.clone())
+                .url(item.url.clone())
+                .description(format!(
+                    "{}\n価格: {}\nタグ: {}",
+                    item.shop.name,
+                    item.price,
+                    item.tags
+                        .iter()
+                        .map(|tag| tag.name.clone())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                ));
+
+            if let Some(image) = item.images.first() {
+                embed = embed.image(image.original.clone());
+            }
+
+            embed
+        })
     }
 }
