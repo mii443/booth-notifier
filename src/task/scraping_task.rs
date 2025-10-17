@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::time::Duration;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
     booth::item::{get_recent_item_ids, BoothItem},
@@ -21,6 +21,7 @@ impl ScrapingTask {
     }
 
     pub async fn run(&mut self, db: &DatabaseClient) -> Result<Vec<BoothItem>> {
+        debug!("Starting scraping task");
         if self.last_run_item_ids.is_empty()
             && let Some(run) = db.get_latest_fetch_runs(1).await?.first()
         {

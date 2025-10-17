@@ -27,7 +27,6 @@ impl NotifyTask {
         for guild in &guilds {
             self.process_guild(ctx, db, guild, items).await?;
         }
-
         Ok(())
     }
 
