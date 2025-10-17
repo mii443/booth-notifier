@@ -11,13 +11,14 @@ use crate::{
     rename = "avatar",
     guild_only,
     subcommands("add"),
-    subcommand_required
+    subcommand_required,
+    owners_only
 )]
 pub async fn avatar_command(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(slash_command, rename = "add", guild_only, ephemeral)]
+#[poise::command(slash_command, rename = "add", guild_only, ephemeral, owners_only)]
 pub async fn add(
     ctx: Context<'_>,
     avatar_name: String,
