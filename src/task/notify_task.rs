@@ -88,10 +88,7 @@ impl NotifyTask {
             return Ok(false);
         };
 
-        let filter: Filter = if let Some(filter) = db
-            .get_notification_filter(filter_id)
-            .await?
-        {
+        let filter: Filter = if let Some(filter) = db.get_notification_filter(filter_id).await? {
             if let Ok(filter) = serde_yaml::from_str(&filter.rule_yaml) {
                 filter
             } else {
@@ -144,11 +141,7 @@ impl NotifyTask {
                     "{}\n価格: {}\nタグ: {}",
                     item.shop.name,
                     item.price,
-                    item.tags
-                        .iter()
-                        .map(|tag| tag.name.clone())
-                        .collect::<Vec<String>>()
-                        .join(", ")
+                    self.get_tags_str(item)
                 ));
 
             if let Some(image) = item.images.first() {
@@ -157,5 +150,20 @@ impl NotifyTask {
 
             embed
         })
+    }
+
+    fn get_tags_str(&self, item: &BoothItem) -> String {
+        let tags = item
+            .tags
+            .iter()
+            .map(|tag| tag.name.clone())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        if tags.len() <= 100 {
+            tags
+        } else {
+            tags.chars().take(100).collect::<String>().to_string() + "..."
+        }
     }
 }
