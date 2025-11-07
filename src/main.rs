@@ -16,6 +16,7 @@ use tracing::info;
 
 use crate::commands::{
     avatar::avatar_command,
+    notification::booth_command,
     register::{register, register_server},
 };
 
@@ -58,7 +59,7 @@ async fn main() -> Result<()> {
                 Box::pin(event_handler(ctx, event, framework, data))
             },
             owners,
-            commands: vec![avatar_command(), register(), register_server()],
+            commands: vec![avatar_command(), booth_command(), register(), register_server()],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(prefix),
                 ..Default::default()
