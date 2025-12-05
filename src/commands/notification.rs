@@ -1,10 +1,6 @@
 use poise::serenity_prelude::ChannelId;
 
-use crate::{
-    database::NewNotificationFilter,
-    filter::Filter,
-    Context, Error,
-};
+use crate::{database::NewNotificationFilter, filter::Filter, Context, Error};
 
 // Main command
 #[poise::command(
@@ -37,7 +33,7 @@ pub async fn filter(_ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, rename = "add", guild_only, ephemeral, owners_only)]
 pub async fn filter_add(
     ctx: Context<'_>,
-    #[description = "Filter definition in YAML format"] yaml: String,
+    #[description = "Filter definition in YAML or JSON format"] yaml: String,
 ) -> Result<(), Error> {
     let db = ctx.data().db.clone();
 
@@ -45,8 +41,13 @@ pub async fn filter_add(
     let filter: Filter = match serde_yaml::from_str(&yaml) {
         Ok(f) => f,
         Err(e) => {
-            ctx.say(format!("❌ YAML parse error: {}", e)).await?;
-            return Ok(());
+            if let Ok(f) = serde_json::from_str(&yaml) {
+                f
+            } else {
+                ctx.say(format!("❌ Failed to parse filter definition: {}", e))
+                    .await?;
+                return Ok(());
+            }
         }
     };
 
@@ -125,7 +126,9 @@ pub async fn filter_view(
     match filter {
         Some(f) => {
             // Check if linked to channels
-            let channels = db.get_channels_by_guild(ctx.guild_id().unwrap().get() as i64).await?;
+            let channels = db
+                .get_channels_by_guild(ctx.guild_id().unwrap().get() as i64)
+                .await?;
             let linked_channels: Vec<_> = channels
                 .iter()
                 .filter(|c| c.filter_id == Some(filter_id))
@@ -168,7 +171,9 @@ pub async fn filter_delete(
     let db = ctx.data().db.clone();
 
     // Check if linked to channels
-    let channels = db.get_channels_by_guild(ctx.guild_id().unwrap().get() as i64).await?;
+    let channels = db
+        .get_channels_by_guild(ctx.guild_id().unwrap().get() as i64)
+        .await?;
     let linked_channels: Vec<_> = channels
         .iter()
         .filter(|c| c.filter_id == Some(filter_id))
@@ -217,7 +222,13 @@ pub async fn channel(_ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Set filter for a channel
-#[poise::command(slash_command, rename = "set-filter", guild_only, ephemeral, owners_only)]
+#[poise::command(
+    slash_command,
+    rename = "set-filter",
+    guild_only,
+    ephemeral,
+    owners_only
+)]
 pub async fn channel_set_filter(
     ctx: Context<'_>,
     #[description = "Discord channel"] channel: ChannelId,
@@ -259,7 +270,13 @@ pub async fn channel_set_filter(
 }
 
 /// Clear filter from a channel
-#[poise::command(slash_command, rename = "clear-filter", guild_only, ephemeral, owners_only)]
+#[poise::command(
+    slash_command,
+    rename = "clear-filter",
+    guild_only,
+    ephemeral,
+    owners_only
+)]
 pub async fn channel_clear_filter(
     ctx: Context<'_>,
     #[description = "Discord channel"] channel: ChannelId,
@@ -269,8 +286,11 @@ pub async fn channel_clear_filter(
     // Check if channel exists
     let existing_channel = db.get_discord_channel(channel.get() as i64).await?;
     if existing_channel.is_none() {
-        ctx.say(format!("❌ Channel <#{}> is not registered in the database.", channel.get()))
-            .await?;
+        ctx.say(format!(
+            "❌ Channel <#{}> is not registered in the database.",
+            channel.get()
+        ))
+        .await?;
         return Ok(());
     }
 
@@ -286,10 +306,7 @@ pub async fn channel_clear_filter(
             channel.get()
         )
     } else {
-        format!(
-            "ℹ️ Channel <#{}> had no filter assigned.",
-            channel.get()
-        )
+        format!("ℹ️ Channel <#{}> had no filter assigned.", channel.get())
     };
 
     ctx.say(message).await?;
