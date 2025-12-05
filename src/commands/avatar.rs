@@ -10,11 +10,56 @@ use crate::{
     slash_command,
     rename = "avatar",
     guild_only,
-    subcommands("add"),
+    subcommands("add", "channel_register"),
     subcommand_required,
     owners_only
 )]
 pub async fn avatar_command(_ctx: Context<'_>) -> Result<(), Error> {
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    rename = "channel_register",
+    guild_only,
+    ephemeral,
+    owners_only
+)]
+pub async fn channel_register(ctx: Context<'_>, channel_name: String) -> Result<(), Error> {
+    let db = ctx.data().db.clone();
+
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command must be used in a guild")?;
+    let db_guild = db.get_discord_guild(guild_id.get() as i64).await?;
+
+    let Some(db_guild) = db_guild else {
+        ctx.say("This guild is not registered. Please register the guild first.")
+            .await?;
+        return Ok(());
+    };
+
+    let channel = guild_id
+        .channels(&ctx.http())
+        .await?
+        .into_values()
+        .find(|c| c.name == channel_name);
+
+    let Some(channel) = channel else {
+        ctx.say("Channel not found").await?;
+        return Ok(());
+    };
+
+    db.upsert_discord_channel(NewDiscordChannel {
+        channel_id: channel.id.get() as i64,
+        guild_id: db_guild.guild_id,
+        name: channel_name.clone(),
+        filter_id: None,
+    })
+    .await?;
+
+    ctx.reply("チャンネルを登録しました").await?;
+
     Ok(())
 }
 
@@ -68,7 +113,9 @@ pub async fn add(
         });
     }
 
-    let guild_id = ctx.guild_id().ok_or("This command must be used in a guild")?;
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command must be used in a guild")?;
     let db_guild = db.get_discord_guild(guild_id.get() as i64).await?;
 
     let Some(db_guild) = db_guild else {
