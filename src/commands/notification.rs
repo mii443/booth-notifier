@@ -1,6 +1,12 @@
-use poise::serenity_prelude::ChannelId;
+use poise::{serenity_prelude::ChannelId, Modal};
 
 use crate::{database::NewNotificationFilter, filter::Filter, Context, Error};
+
+#[derive(Debug, Modal)]
+struct EditFilterModal {
+    #[name = "Filter Definition (YAML or JSON)"]
+    filter_definition: String,
+}
 
 // Main command
 #[poise::command(
@@ -69,6 +75,29 @@ pub async fn filter_add(
         saved_filter.id, saved_filter.id
     ))
     .await?;
+
+    Ok(())
+}
+
+// Edit a filter within Modal
+#[poise::command(slash_command, rename = "edit", guild_only, ephemeral, owners_only)]
+pub async fn filter_edit(
+    ctx: Context<'_>,
+    #[description = "Filter ID to edit"] filter_id: i64,
+) -> Result<(), Error> {
+    let db = ctx.data().db.clone();
+
+    let filter = db.get_notification_filter(filter_id).await?;
+
+    match filter {
+        Some(f) => {
+            let data = EditFilterModal::execute(ctx).await?;
+        }
+        None => {
+            ctx.say(format!("❌ Filter with ID `{}` not found", filter_id))
+                .await?;
+        }
+    }
 
     Ok(())
 }
