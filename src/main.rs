@@ -9,15 +9,18 @@ use anyhow::Result;
 use database::DatabaseClient;
 use event_handler::event_handler;
 use poise::{
-    serenity_prelude::{self as serenity},
     PrefixFrameworkOptions,
+    serenity_prelude::{self as serenity},
 };
 use tracing::info;
 
-use crate::commands::{
-    avatar::avatar_command,
-    notification::booth_command,
-    register::{register, register_server},
+use crate::{
+    booth::item::BoothDbClient,
+    commands::{
+        avatar::avatar_command,
+        notification::booth_command,
+        register::{register, register_server},
+    },
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -25,6 +28,7 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub struct Data {
     pub db: DatabaseClient,
+    pub booth_db: BoothDbClient,
 }
 
 #[tokio::main]
@@ -37,6 +41,11 @@ async fn main() -> Result<()> {
     // Load environment variables
     let token = std::env::var("BOT_TOKEN")?;
     let database_url = std::env::var("DATABASE_URL")?;
+    let booth_db_database_url = std::env::var("BOOTH_DB_DATABASE_URL")?;
+    let booth_db_recent_item_limit = std::env::var("BOOTH_DB_RECENT_ITEM_LIMIT")
+        .unwrap_or_else(|_| "120".to_string())
+        .parse::<i64>()
+        .unwrap_or(120);
     let owners = std::env::var("BOT_OWNERS")?
         .split(',')
         .map(|s| s.parse())
@@ -46,6 +55,7 @@ async fn main() -> Result<()> {
 
     // Initialize database client
     let db = DatabaseClient::new(&database_url).await?;
+    let booth_db = BoothDbClient::new(&booth_db_database_url, booth_db_recent_item_limit).await?;
 
     // Run migrations
     db.migrate().await?;
@@ -53,13 +63,18 @@ async fn main() -> Result<()> {
     info!("Database connected and migrations completed");
 
     let framework = poise::Framework::builder()
-        .setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(Data { db }) }))
+        .setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(Data { db, booth_db }) }))
         .options(poise::FrameworkOptions {
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
             },
             owners,
-            commands: vec![avatar_command(), booth_command(), register(), register_server()],
+            commands: vec![
+                avatar_command(),
+                booth_command(),
+                register(),
+                register_server(),
+            ],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(prefix),
                 ..Default::default()

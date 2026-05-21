@@ -2,8 +2,8 @@ use poise::serenity_prelude::{self as serenity, FullEvent};
 use tracing::{error, info};
 
 use crate::{
-    task::{NotifyTask, ScrapingTask},
     Data, Error,
+    task::{NotifyTask, ScrapingTask},
 };
 
 pub async fn event_handler(
@@ -30,19 +30,14 @@ async fn ready_handler(
 
     let ctx = ctx.clone();
     let database_client = data.db.clone();
+    let booth_db = data.booth_db.clone();
     tokio::spawn(async move {
         let check_interval = std::env::var("CHECK_INTERVAL_SECONDS")
             .unwrap_or_else(|_| "30".to_string())
             .parse::<u64>()
             .unwrap_or(60);
         let check_interval = std::time::Duration::from_secs(check_interval);
-        let fetch_interval = std::env::var("FETCH_INTERVAL_MILLISECONDS")
-            .unwrap_or_else(|_| "500".to_string())
-            .parse::<u64>()
-            .unwrap_or(500);
-        let fetch_interval = std::time::Duration::from_millis(fetch_interval);
-
-        let mut scraping_task = ScrapingTask::new(fetch_interval);
+        let mut scraping_task = ScrapingTask::new(booth_db);
         let mut notify_task = NotifyTask::new();
 
         loop {

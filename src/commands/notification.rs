@@ -1,6 +1,6 @@
-use poise::{serenity_prelude::ChannelId, Modal};
+use poise::{Modal, serenity_prelude::ChannelId};
 
-use crate::{database::NewNotificationFilter, filter::Filter, Context, Error};
+use crate::{Context, Error, database::NewNotificationFilter, filter::Filter};
 
 #[derive(Debug, Modal)]
 struct EditFilterModal {
@@ -90,8 +90,8 @@ pub async fn filter_edit(
     let filter = db.get_notification_filter(filter_id).await?;
 
     match filter {
-        Some(f) => {
-            let data = EditFilterModal::execute(ctx).await?;
+        Some(_f) => {
+            ctx.say("Filter edit modal is not available yet.").await?;
         }
         None => {
             ctx.say(format!("❌ Filter with ID `{}` not found", filter_id))

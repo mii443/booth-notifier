@@ -1,64 +1,263 @@
-use std::sync::Arc;
-
 use anyhow::{Context, Result};
-use reqwest::{cookie::Jar, Client, Url};
-use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
+use sqlx::{
+    FromRow,
+    postgres::{PgPool, PgPoolOptions},
+    types::chrono::{DateTime, Utc},
+};
 
-fn get_client(url: &Url) -> Result<Client> {
-    let cookit_str = "adult=t;";
-    let cookies = Arc::new(Jar::default());
-    cookies.add_cookie_str(cookit_str, url);
-
-    let client_builder = reqwest::Client::builder();
-    let client: Client = client_builder
-        .cookie_provider(cookies)
-        .build()
-        .context("Failed to build HTTP client")?;
-
-    Ok(client)
+#[derive(Clone)]
+pub struct BoothDbClient {
+    pool: PgPool,
+    recent_item_limit: i64,
 }
 
-pub async fn get_recent_item_ids() -> Result<Vec<u64>> {
-    let url = Url::parse(
-        "https://booth.pm/ja/items?adult=include&in_stock=true&sort=new&tags%5B%5D=VRChat",
-    )
-    .context("Failed to parse URL")?;
-    let client = get_client(&url)?;
-    let response = client.get(url).send().await?.text().await
-        .context("Failed to get response text")?;
-    let document = Html::parse_document(&response);
+impl BoothDbClient {
+    pub async fn new(database_url: &str, recent_item_limit: i64) -> Result<Self> {
+        let pool = PgPoolOptions::new()
+            .max_connections(5)
+            .connect(database_url)
+            .await
+            .context("Failed to connect to booth-db")?;
 
-    let selector = Selector::parse("li.item-card.l-card[data-product-id]")
-        .map_err(|e| anyhow::anyhow!("Failed to parse selector: {:?}", e))?;
-
-    let elements = document.select(&selector);
-    let mut products = vec![];
-    for element in elements {
-        if let Some(product_id) = element.value().attr("data-product-id") {
-            products.push(product_id.parse::<u64>()
-                .context(format!("Failed to parse product ID: {}", product_id))?);
-        }
+        Ok(Self {
+            pool,
+            recent_item_limit,
+        })
     }
 
-    products.reverse();
-    Ok(products)
+    pub async fn get_recent_item_ids(&self) -> Result<Vec<u64>> {
+        let mut item_ids = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT id
+            FROM items
+            WHERE COALESCE(is_sold_out, false) = false
+              AND COALESCE(is_end_of_sale, false) = false
+            ORDER BY published_at DESC, id DESC
+            LIMIT $1
+            "#,
+        )
+        .bind(self.recent_item_limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch recent item ids from booth-db")?;
+
+        item_ids.reverse();
+        item_ids
+            .into_iter()
+            .map(|id| {
+                u64::try_from(id)
+                    .with_context(|| format!("booth-db returned negative item id {id}"))
+            })
+            .collect()
+    }
+
+    pub async fn get_item(&self, id: u64) -> Result<BoothItem> {
+        let id = i64::try_from(id).context("Item id is too large for booth-db")?;
+        let row = sqlx::query_as::<_, BoothDbItemRow>(
+            r#"
+            SELECT
+                i.id,
+                i.url,
+                i.title,
+                i.price,
+                i.shop_name,
+                i.shop_url,
+                i.shop_thumbnail_url,
+                i.description,
+                i.published_at,
+                i.is_adult,
+                i.is_sold_out,
+                i.is_end_of_sale,
+                i.wish_lists_count,
+                i.wished,
+                i.tags,
+                c.id AS category_id,
+                c.name AS category_name,
+                c.url AS category_url,
+                c.parent_name AS category_parent_name,
+                c.parent_url AS category_parent_url
+            FROM items i
+            LEFT JOIN categories c ON c.id = i.category_id
+            WHERE i.id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .with_context(|| format!("Failed to fetch item {id} from booth-db"))?
+        .with_context(|| format!("Item {id} was not found in booth-db"))?;
+
+        let image_urls = sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT url
+            FROM item_images
+            WHERE item_id = $1
+            ORDER BY display_order ASC
+            "#,
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await
+        .with_context(|| format!("Failed to fetch images for item {id} from booth-db"))?;
+
+        let variation_rows = sqlx::query_as::<_, BoothDbVariationRow>(
+            r#"
+            SELECT json_variation_id, name, price, variation_type
+            FROM item_variations
+            WHERE item_id = $1
+            ORDER BY id ASC
+            "#,
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await
+        .with_context(|| format!("Failed to fetch variations for item {id} from booth-db"))?;
+
+        Ok(row.into_item(image_urls, variation_rows))
+    }
 }
 
-impl BoothItem {
-    pub async fn from_id(id: u64) -> Result<Self> {
-        let url = format!("https://booth.pm/ja/items/{id}.json");
-        let client = reqwest::Client::new();
-        let resp = client
-            .get(&url)
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .send()
-            .await?;
-        let text = resp.text().await?;
-        let item: BoothItem = serde_json::from_str(&text)
-            .with_context(|| format!("Failed to parse JSON for item ID {}: {}", id, text))?;
-        Ok(item)
+#[derive(Debug, FromRow)]
+struct BoothDbItemRow {
+    id: i64,
+    url: String,
+    title: String,
+    price: i64,
+    shop_name: String,
+    shop_url: String,
+    shop_thumbnail_url: Option<String>,
+    description: String,
+    published_at: DateTime<Utc>,
+    is_adult: Option<bool>,
+    is_sold_out: Option<bool>,
+    is_end_of_sale: Option<bool>,
+    wish_lists_count: Option<i64>,
+    wished: Option<bool>,
+    tags: Option<Vec<String>>,
+    category_id: Option<i64>,
+    category_name: Option<String>,
+    category_url: Option<String>,
+    category_parent_name: Option<String>,
+    category_parent_url: Option<String>,
+}
+
+impl BoothDbItemRow {
+    fn into_item(
+        self,
+        image_urls: Vec<String>,
+        variation_rows: Vec<BoothDbVariationRow>,
+    ) -> BoothItem {
+        let category = Category {
+            id: self.category_id.unwrap_or_default() as u64,
+            name: self.category_name.unwrap_or_default(),
+            parent: self.category_parent_name.map(|name| CategoryParent {
+                name,
+                url: self.category_parent_url.unwrap_or_default(),
+            }),
+            url: self.category_url.unwrap_or_default(),
+        };
+
+        let tags = self
+            .tags
+            .unwrap_or_default()
+            .into_iter()
+            .map(|name| Tag {
+                url: String::new(),
+                name,
+            })
+            .collect();
+
+        let images = image_urls
+            .into_iter()
+            .map(|url| Image {
+                caption: None,
+                resized: url.clone(),
+                original: url,
+            })
+            .collect();
+
+        let variations = variation_rows
+            .into_iter()
+            .map(BoothDbVariationRow::into_variation)
+            .collect();
+
+        BoothItem {
+            description: self.description,
+            factory_description: None,
+            id: self.id as u64,
+            is_adult: self.is_adult.unwrap_or(false),
+            is_buyee_possible: false,
+            is_end_of_sale: self.is_end_of_sale.unwrap_or(false),
+            is_placeholder: false,
+            is_sold_out: self.is_sold_out.unwrap_or(false),
+            name: self.title,
+            published_at: self.published_at.to_rfc3339(),
+            price: format!("JPY {}", self.price),
+            purchase_limit: None,
+            shipping_info: String::new(),
+            small_stock: None,
+            url: self.url,
+            wish_list_url: String::new(),
+            wish_lists_count: self.wish_lists_count.unwrap_or_default() as u64,
+            wished: self.wished.unwrap_or(false),
+            buyee_variations: vec![],
+            category,
+            embeds: vec![],
+            images,
+            order: None,
+            gift: None,
+            report_url: String::new(),
+            share: Share::default(),
+            shop: Shop {
+                name: self.shop_name,
+                subdomain: String::new(),
+                thumbnail_url: self.shop_thumbnail_url.unwrap_or_default(),
+                url: self.shop_url,
+                verified: false,
+            },
+            sound: None,
+            tags,
+            tag_banners: vec![],
+            tag_combination: None,
+            tracks: None,
+            variations,
+        }
+    }
+}
+
+#[derive(Debug, FromRow)]
+struct BoothDbVariationRow {
+    json_variation_id: Option<i64>,
+    name: Option<String>,
+    price: Option<i64>,
+    variation_type: Option<String>,
+}
+
+impl BoothDbVariationRow {
+    fn into_variation(self) -> Variation {
+        Variation {
+            buyee_html: None,
+            downloadable: None,
+            factory_image_url: None,
+            has_download_code: false,
+            id: self.json_variation_id.unwrap_or_default() as u64,
+            is_anshin_booth_pack: false,
+            is_empty_allocatable_stock_with_preorder: false,
+            is_empty_stock: false,
+            is_factory_item: false,
+            is_mailbin: false,
+            is_waiting_on_arrival: false,
+            name: self.name,
+            order_url: None,
+            price: self.price.unwrap_or_default(),
+            small_stock: None,
+            status: String::new(),
+            kind: match self.variation_type.as_deref() {
+                Some("digital") => VariationType::Digital,
+                _ => VariationType::Other,
+            },
+        }
     }
 }
 

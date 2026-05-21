@@ -1,21 +1,20 @@
 use anyhow::Result;
-use std::time::Duration;
 use tracing::{debug, info};
 
 use crate::{
-    booth::item::{get_recent_item_ids, BoothItem},
+    booth::item::{BoothDbClient, BoothItem},
     database::{DatabaseClient, NewFetchRun, NewItemSnapshot},
 };
 
 pub struct ScrapingTask {
-    pub fetch_interval: Duration,
+    booth_db: BoothDbClient,
     last_run_item_ids: Vec<u64>,
 }
 
 impl ScrapingTask {
-    pub fn new(fetch_interval: Duration) -> Self {
+    pub fn new(booth_db: BoothDbClient) -> Self {
         Self {
-            fetch_interval,
+            booth_db,
             last_run_item_ids: vec![],
         }
     }
@@ -28,7 +27,7 @@ impl ScrapingTask {
             self.last_run_item_ids = run.item_ids.iter().map(|id| *id as u64).collect();
         }
 
-        let item_ids = get_recent_item_ids().await?;
+        let item_ids = self.booth_db.get_recent_item_ids().await?;
         let new_item_ids = self.calc_new_item_ids(&item_ids);
 
         db.create_fetch_run(NewFetchRun {
@@ -40,7 +39,7 @@ impl ScrapingTask {
 
         let mut items = vec![];
         for item_id in &new_item_ids {
-            let item = BoothItem::from_id(*item_id).await?;
+            let item = self.booth_db.get_item(*item_id).await?;
 
             db.create_item_snapshot(NewItemSnapshot {
                 item_id: *item_id as i64,
@@ -52,8 +51,6 @@ impl ScrapingTask {
             info!("New item found: {} - {}", item.name, item.url);
 
             items.push(item);
-
-            tokio::time::sleep(self.fetch_interval).await;
         }
 
         Ok(items)
