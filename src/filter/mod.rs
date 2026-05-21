@@ -37,6 +37,7 @@ pub enum Field {
     Tags,
     Name,
     Description,
+    Category,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

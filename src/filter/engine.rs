@@ -32,11 +32,16 @@ impl FilteringEngine {
 
     fn check_rule(&self, rule: &Rule, item: &BoothItem) -> bool {
         let matched = match rule.field {
-            Field::Name | Field::Description => {
-                let target = if rule.field == Field::Name {
-                    &item.name
-                } else {
-                    &item.description
+            Field::Name | Field::Description | Field::Category => {
+                let category;
+                let target = match rule.field {
+                    Field::Name => &item.name,
+                    Field::Description => &item.description,
+                    Field::Category => {
+                        category = self.category_text(item);
+                        &category
+                    }
+                    Field::Tags => unreachable!("tags are handled separately"),
                 };
 
                 self.check_string_rule(rule, target)
@@ -49,6 +54,14 @@ impl FilteringEngine {
         } else {
             !matched
         }
+    }
+
+    fn category_text(&self, item: &BoothItem) -> String {
+        let mut parts = vec![item.category.name.as_str()];
+        if let Some(parent) = &item.category.parent {
+            parts.push(parent.name.as_str());
+        }
+        parts.join(" ")
     }
 
     fn check_string_rule(&self, rule: &Rule, value: &str) -> bool {
@@ -102,7 +115,7 @@ impl FilteringEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::booth::item::{BoothItem, Tag};
+    use crate::booth::item::{BoothItem, Category, CategoryParent, Tag};
     use crate::filter::{Field, Filter, FilterGroup, Op, Pattern, Rule, TagMode};
 
     #[test]
@@ -323,6 +336,73 @@ mod tests {
             name: "fuga".to_string(),
             ..Default::default()
         }];
+
+        assert!(engine.check(&item));
+    }
+
+    #[test]
+    fn test_category_pattern() {
+        let filter = Filter {
+            groups: vec![FilterGroup {
+                rules: vec![Rule {
+                    field: Field::Category,
+                    op: Op::Include,
+                    pattern: Pattern::Text {
+                        value: "3Dモデル".to_string(),
+                    },
+                    case_sensitive: false,
+                    regex_flags: None,
+                    tag_mode: None,
+                }],
+            }],
+            schema_version: 1,
+        };
+
+        let engine = FilteringEngine::new(filter);
+        let mut item = BoothItem {
+            category: Category {
+                name: "3Dモデル".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert!(engine.check(&item));
+
+        item.category.name = "素材".to_string();
+        assert!(!engine.check(&item));
+    }
+
+    #[test]
+    fn test_category_parent_pattern() {
+        let filter = Filter {
+            groups: vec![FilterGroup {
+                rules: vec![Rule {
+                    field: Field::Category,
+                    op: Op::Include,
+                    pattern: Pattern::Text {
+                        value: "VRChat".to_string(),
+                    },
+                    case_sensitive: false,
+                    regex_flags: None,
+                    tag_mode: None,
+                }],
+            }],
+            schema_version: 1,
+        };
+
+        let engine = FilteringEngine::new(filter);
+        let item = BoothItem {
+            category: Category {
+                name: "衣装".to_string(),
+                parent: Some(CategoryParent {
+                    name: "VRChat".to_string(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         assert!(engine.check(&item));
     }
