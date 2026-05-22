@@ -1,7 +1,6 @@
 use anyhow::Result;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::types::time::OffsetDateTime;
-use sqlx::types::JsonValue;
 use std::collections::HashMap;
 
 use super::models::{
@@ -301,15 +300,15 @@ impl DatabaseClient {
         &self,
         new_filter: NewNotificationFilter,
     ) -> Result<NotificationFilter> {
-        let filter = sqlx::query_as!(
-            NotificationFilter,
+        let filter = sqlx::query_as::<_, NotificationFilter>(
             r#"
-            INSERT INTO notification_filters (rule_yaml)
-            VALUES ($1)
-            RETURNING id, rule_yaml, created_at
+            INSERT INTO notification_filters (guild_id, rule_yaml)
+            VALUES ($1, $2)
+            RETURNING id, guild_id, rule_yaml, created_at
             "#,
-            new_filter.rule_yaml
         )
+        .bind(new_filter.guild_id)
+        .bind(new_filter.rule_yaml)
         .fetch_one(&self.pool)
         .await?;
 
@@ -318,15 +317,14 @@ impl DatabaseClient {
 
     /// Get a notification filter by ID
     pub async fn get_notification_filter(&self, id: i64) -> Result<Option<NotificationFilter>> {
-        let filter = sqlx::query_as!(
-            NotificationFilter,
+        let filter = sqlx::query_as::<_, NotificationFilter>(
             r#"
-            SELECT id, rule_yaml, created_at
+            SELECT id, guild_id, rule_yaml, created_at
             FROM notification_filters
             WHERE id = $1
             "#,
-            id
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -373,13 +371,12 @@ impl DatabaseClient {
 
     /// Get all notification filters
     pub async fn get_all_notification_filters(&self) -> Result<Vec<NotificationFilter>> {
-        let filters = sqlx::query_as!(
-            NotificationFilter,
+        let filters = sqlx::query_as::<_, NotificationFilter>(
             r#"
-            SELECT id, rule_yaml, created_at
+            SELECT id, guild_id, rule_yaml, created_at
             FROM notification_filters
             ORDER BY created_at DESC
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -397,19 +394,80 @@ impl DatabaseClient {
             return Ok(HashMap::new());
         }
 
-        let filters = sqlx::query_as!(
-            NotificationFilter,
+        let filters = sqlx::query_as::<_, NotificationFilter>(
             r#"
-            SELECT id, rule_yaml, created_at
+            SELECT id, guild_id, rule_yaml, created_at
             FROM notification_filters
             WHERE id = ANY($1)
             "#,
-            ids
         )
+        .bind(ids)
         .fetch_all(&self.pool)
         .await?;
 
         Ok(filters.into_iter().map(|f| (f.id, f)).collect())
+    }
+
+    /// Get notification filters for a specific guild.
+    pub async fn get_notification_filters_by_guild(
+        &self,
+        guild_id: i64,
+    ) -> Result<Vec<NotificationFilter>> {
+        let filters = sqlx::query_as::<_, NotificationFilter>(
+            r#"
+            SELECT id, guild_id, rule_yaml, created_at
+            FROM notification_filters
+            WHERE guild_id = $1
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(filters)
+    }
+
+    /// Update a notification filter definition.
+    pub async fn update_notification_filter(
+        &self,
+        id: i64,
+        guild_id: i64,
+        rule_yaml: String,
+    ) -> Result<Option<NotificationFilter>> {
+        let filter = sqlx::query_as::<_, NotificationFilter>(
+            r#"
+            UPDATE notification_filters
+            SET rule_yaml = $3,
+                guild_id = COALESCE(guild_id, $2)
+            WHERE id = $1
+              AND (guild_id = $2 OR guild_id IS NULL)
+            RETURNING id, guild_id, rule_yaml, created_at
+            "#,
+        )
+        .bind(id)
+        .bind(guild_id)
+        .bind(rule_yaml)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(filter)
+    }
+
+    /// Delete a Discord channel registration.
+    pub async fn delete_discord_channel(&self, channel_id: i64, guild_id: i64) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM discord_channels
+            WHERE channel_id = $1 AND guild_id = $2
+            "#,
+        )
+        .bind(channel_id)
+        .bind(guild_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
     }
 
     /// Update special channels configuration for a Discord guild

@@ -5,7 +5,7 @@ use tracing::{error, info};
 
 use crate::{
     booth::item::BoothItem,
-    database::{models::NotificationFilter, DatabaseClient, DiscordChannel, DiscordGuild},
+    database::{DatabaseClient, DiscordChannel, DiscordGuild, models::NotificationFilter},
     filter::{Filter, FilteringEngine},
 };
 

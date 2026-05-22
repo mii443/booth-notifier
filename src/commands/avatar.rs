@@ -1,9 +1,9 @@
 use poise::serenity_prelude::{ChannelType, CreateChannel};
 
 use crate::{
+    Context, Error,
     database::{NewDiscordChannel, NewNotificationFilter},
     filter::{Field, Filter, FilterGroup, Op, Pattern, Rule, TagMode},
-    Context, Error,
 };
 
 #[poise::command(
@@ -162,6 +162,7 @@ pub async fn add(
 
     let filter = db
         .create_notification_filter(NewNotificationFilter {
+            guild_id: Some(db_guild.guild_id),
             rule_yaml: serde_yaml::to_string(&filter)?,
         })
         .await?;

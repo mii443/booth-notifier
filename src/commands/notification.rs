@@ -1,12 +1,6 @@
-use poise::{Modal, serenity_prelude::ChannelId};
+use poise::serenity_prelude::ChannelId;
 
 use crate::{Context, Error, database::NewNotificationFilter, filter::Filter};
-
-#[derive(Debug, Modal)]
-struct EditFilterModal {
-    #[name = "Filter Definition (YAML or JSON)"]
-    filter_definition: String,
-}
 
 // Main command
 #[poise::command(
@@ -66,6 +60,7 @@ pub async fn filter_add(
     // Save filter
     let saved_filter = db
         .create_notification_filter(NewNotificationFilter {
+            guild_id: ctx.guild_id().map(|id| id.get() as i64),
             rule_yaml: serde_yaml::to_string(&filter)?,
         })
         .await?;

@@ -4,6 +4,7 @@ mod database;
 mod event_handler;
 mod filter;
 mod task;
+mod web;
 
 use anyhow::Result;
 use database::DatabaseClient;
@@ -12,7 +13,7 @@ use poise::{
     PrefixFrameworkOptions,
     serenity_prelude::{self as serenity},
 };
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     booth::item::BoothDbClient,
@@ -46,11 +47,15 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| "120".to_string())
         .parse::<i64>()
         .unwrap_or(120);
-    let owners = std::env::var("BOT_OWNERS")?
+    let owner_ids = std::env::var("BOT_OWNERS")?
         .split(',')
-        .map(|s| s.parse())
+        .map(|s| s.parse::<u64>())
         .collect::<Result<std::collections::HashSet<_>, _>>()
         .map_err(|e| anyhow::anyhow!("Failed to parse BOT_OWNERS: {}", e))?;
+    let owners = owner_ids
+        .iter()
+        .map(|id| serenity::UserId::new(*id))
+        .collect::<std::collections::HashSet<_>>();
     let prefix = std::env::var("BOT_PREFIX").unwrap_or_else(|_| "!".to_string());
 
     // Initialize database client
@@ -61,6 +66,18 @@ async fn main() -> Result<()> {
     db.migrate().await?;
 
     info!("Database connected and migrations completed");
+
+    let web_task = match web::WebConfig::from_env(db.clone(), token.clone(), owner_ids.clone())? {
+        Some(config) => Some(tokio::spawn(async move {
+            if let Err(err) = web::serve(config).await {
+                error!(error = %err, "web UI stopped");
+            }
+        })),
+        None => {
+            info!("WEB_BIND is not set; web UI disabled");
+            None
+        }
+    };
 
     let framework = poise::Framework::builder()
         .setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(Data { db, booth_db }) }))
@@ -91,6 +108,10 @@ async fn main() -> Result<()> {
     .await?;
 
     client.start().await?;
+
+    if let Some(web_task) = web_task {
+        web_task.abort();
+    }
 
     Ok(())
 }

@@ -5,14 +5,18 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.100"
+axum = { version = "0.7.9", features = ["macros"] }
 futures = "0.3.31"
 poise = "0.6.1"
+rand = "0.8.5"
 regex = "1.12.2"
+reqwest = { version = "0.12.9", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 serde_yaml = "0.9.34"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "chrono", "time"] }
 tokio = { version = "1.48.0", features = ["full"] }
+tower-http = { version = "0.6.2", features = ["trace"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 

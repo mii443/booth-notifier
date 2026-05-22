@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use sqlx::types::time::OffsetDateTime;
 use sqlx::types::JsonValue;
+use sqlx::types::time::OffsetDateTime;
 
 /// A record of a fetch run that stores which items were fetched
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -36,6 +36,7 @@ pub struct DiscordGuild {
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct NotificationFilter {
     pub id: i64,
+    pub guild_id: Option<i64>,
     pub rule_yaml: String,
     pub created_at: OffsetDateTime,
 }
@@ -78,6 +79,7 @@ pub struct NewDiscordGuild {
 /// Input struct for creating a new notification filter
 #[derive(Debug, Clone)]
 pub struct NewNotificationFilter {
+    pub guild_id: Option<i64>,
     pub rule_yaml: String,
 }
 
