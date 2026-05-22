@@ -450,9 +450,10 @@ async fn filters_page(
         "Filters",
         Some(&session),
         &format!(
-            r#"<section class="panel"><div class="crumb"><a href="/guilds/{guild_id}">{guild_name}</a> / Filters</div><h1>Filters</h1><form class="editor" method="post" action="/guilds/{guild_id}/filters"><label>New filter YAML or JSON</label><textarea name="rule_yaml" required rows="12">{sample}</textarea><button class="primary" type="submit">Create filter</button></form><div class="cards">{list}</div></section>"#,
+            r#"<section class="panel"><div class="crumb"><a href="/guilds/{guild_id}">{guild_name}</a> / Filters</div><h1>Filters</h1><form id="new-filter-form" class="editor" method="post" action="/guilds/{guild_id}/filters">{builder}<details><summary>YAML source</summary><textarea name="rule_yaml" required rows="12">{sample}</textarea></details><button class="primary" type="submit">Create filter</button></form><div class="cards">{list}</div></section>"#,
             guild_id = guild_id,
             guild_name = escape(&guild.name),
+            builder = filter_editor("new-filter-form", SAMPLE_FILTER)?,
             sample = escape(SAMPLE_FILTER),
             list = list
         ),
@@ -498,10 +499,11 @@ async fn edit_filter_page(
         "Edit Filter",
         Some(&session),
         &format!(
-            r#"<section class="panel"><div class="crumb"><a href="/guilds/{guild_id}">{guild_name}</a> / <a href="/guilds/{guild_id}/filters">Filters</a> / #{filter_id}</div><h1>Edit filter #{filter_id}</h1><form class="editor" method="post" action="/guilds/{guild_id}/filters/{filter_id}"><label>Filter YAML or JSON</label><textarea name="rule_yaml" required rows="18">{yaml}</textarea><button class="primary" type="submit">Save filter</button></form></section>"#,
+            r#"<section class="panel"><div class="crumb"><a href="/guilds/{guild_id}">{guild_name}</a> / <a href="/guilds/{guild_id}/filters">Filters</a> / #{filter_id}</div><h1>Edit filter #{filter_id}</h1><form id="edit-filter-form" class="editor" method="post" action="/guilds/{guild_id}/filters/{filter_id}">{builder}<details><summary>YAML source</summary><textarea name="rule_yaml" required rows="18">{yaml}</textarea></details><button class="primary" type="submit">Save filter</button></form></section>"#,
             guild_id = guild_id,
             guild_name = escape(&guild.name),
             filter_id = filter_id,
+            builder = filter_editor("edit-filter-form", &filter.rule_yaml)?,
             yaml = escape(&filter.rule_yaml)
         ),
     ))
@@ -841,6 +843,29 @@ async fn fetch_discord_channels(state: &AppState, guild_id: i64) -> Result<Vec<D
     Ok(channels)
 }
 
+fn filter_editor(form_id: &str, initial_yaml: &str) -> Result<String> {
+    let filter = serde_yaml::from_str::<Filter>(initial_yaml).or_else(|yaml_error| {
+        serde_json::from_str::<Filter>(initial_yaml).map_err(|_| yaml_error)
+    })?;
+    let filter_json = script_json(&serde_json::to_string(&filter)?);
+    Ok(format!(
+        r#"<div class="filter-builder" data-form="{form_id}">
+<script type="application/json" class="filter-data">{filter_json}</script>
+<div class="builder-head"><h2>Visual editor</h2><button type="button" data-action="add-group">Add AND group</button></div>
+<div class="builder-groups"></div>
+</div>"#,
+        form_id = escape(form_id),
+        filter_json = filter_json
+    ))
+}
+
+fn script_json(value: &str) -> String {
+    value
+        .replace('&', "\\u0026")
+        .replace('<', "\\u003c")
+        .replace('>', "\\u003e")
+}
+
 fn normalize_filter(input: &str) -> Result<String> {
     let filter = serde_yaml::from_str::<Filter>(input)
         .or_else(|yaml_error| serde_json::from_str::<Filter>(input).map_err(|_| yaml_error))?;
@@ -960,11 +985,12 @@ fn page(title: &str, session: Option<&WebSession>, body: &str) -> String {
         },
     );
     format!(
-        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title><style>{css}</style></head><body><header><a class="brand" href="/">Booth Notifier</a><nav>{user_nav}</nav></header><main>{body}</main></body></html>"#,
+        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title><style>{css}</style></head><body><header><a class="brand" href="/">Booth Notifier</a><nav>{user_nav}</nav></header><main>{body}</main><script>{js}</script></body></html>"#,
         title = escape(title),
         css = CSS,
         user_nav = user_nav,
-        body = body
+        body = body,
+        js = JS
     )
 }
 
@@ -981,5 +1007,146 @@ schema_version: 1
 "#;
 
 const CSS: &str = r#"
-:root{color-scheme:light;--bg:#f7f8fa;--panel:#fff;--text:#20242a;--muted:#687384;--line:#d8dee8;--accent:#1264a3;--danger:#b42318;--control:#eef2f7}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;line-height:1.45}header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:2}.brand{font-weight:700;color:var(--text);text-decoration:none}nav form{display:flex;align-items:center;gap:12px;color:var(--muted)}main{max-width:1120px;margin:0 auto;padding:32px 20px}.login{max-width:460px;margin:12vh auto;padding:40px 0}.login h1{font-size:34px;margin:0 0 12px}.login p{color:var(--muted);margin:0 0 24px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px}.panel h1{font-size:26px;margin:0 0 20px}.crumb{font-size:13px;color:var(--muted);margin-bottom:8px}.crumb a{color:var(--accent);text-decoration:none}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions a,.primary,button,a.primary{appearance:none;border:1px solid var(--accent);background:var(--accent);color:#fff;text-decoration:none;border-radius:6px;padding:9px 12px;font:inherit;line-height:1.2;cursor:pointer}button{appearance:none;border:1px solid var(--line);background:var(--control);border-radius:6px;padding:8px 10px;font:inherit;cursor:pointer;color:var(--text)}button.danger{border-color:#f3b7b2;background:#fff1f0;color:var(--danger)}.guild-list{display:grid;gap:8px}.guild-row{display:flex;justify-content:space-between;align-items:center;gap:16px;border:1px solid var(--line);border-radius:6px;padding:14px 16px;color:var(--text);text-decoration:none}.guild-row:hover{border-color:var(--accent)}.guild-row small{color:var(--muted)}.editor,.settings{display:grid;gap:12px;margin-bottom:24px}.editor textarea{width:100%;min-height:220px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:12px;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}.settings label{display:grid;gap:6px;color:var(--muted)}select{min-width:220px;max-width:100%;border:1px solid var(--line);border-radius:6px;background:#fff;padding:8px 10px;font:inherit}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.cards{display:grid;gap:12px}.card{border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:12px}.card h2{font-size:18px;margin:0}.card p{margin:4px 0 0;color:var(--muted)}pre{margin:0;max-height:220px;overflow:auto;background:#101820;color:#eef6ff;border-radius:6px;padding:12px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}.row-actions{display:flex;gap:8px;align-items:center}.row-actions a{color:var(--accent);text-decoration:none;padding:8px 0}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid var(--line);padding:11px 8px;vertical-align:middle}th{font-size:13px;color:var(--muted);font-weight:600}.inline{display:inline-flex;align-items:center;gap:8px;margin-right:8px}.empty{color:var(--muted);padding:18px 0}@media(max-width:720px){header{padding:0 14px}main{padding:18px 12px}.panel{padding:16px}.guild-row,td,th{display:block}.toolbar,.inline{display:flex;width:100%}select,.toolbar button,.inline button{width:100%}table,thead,tbody,tr{display:block}thead{display:none}tr{border-bottom:1px solid var(--line);padding:10px 0}td{border:0;padding:6px 0}}
+:root{color-scheme:light;--bg:#f7f8fa;--panel:#fff;--text:#20242a;--muted:#687384;--line:#d8dee8;--accent:#1264a3;--danger:#b42318;--control:#eef2f7;--soft:#f9fbfd}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;line-height:1.45}header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:2}.brand{font-weight:700;color:var(--text);text-decoration:none}nav form{display:flex;align-items:center;gap:12px;color:var(--muted)}main{max-width:1120px;margin:0 auto;padding:32px 20px}.login{max-width:460px;margin:12vh auto;padding:40px 0}.login h1{font-size:34px;margin:0 0 12px}.login p{color:var(--muted);margin:0 0 24px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px}.panel h1{font-size:26px;margin:0 0 20px}.panel h2{font-size:17px;margin:0}.crumb{font-size:13px;color:var(--muted);margin-bottom:8px}.crumb a{color:var(--accent);text-decoration:none}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions a,.primary,button,a.primary{appearance:none;border:1px solid var(--accent);background:var(--accent);color:#fff;text-decoration:none;border-radius:6px;padding:9px 12px;font:inherit;line-height:1.2;cursor:pointer}button{appearance:none;border:1px solid var(--line);background:var(--control);border-radius:6px;padding:8px 10px;font:inherit;cursor:pointer;color:var(--text)}button.danger{border-color:#f3b7b2;background:#fff1f0;color:var(--danger)}button.subtle{background:#fff;color:var(--text);border-color:var(--line)}.guild-list{display:grid;gap:8px}.guild-row{display:flex;justify-content:space-between;align-items:center;gap:16px;border:1px solid var(--line);border-radius:6px;padding:14px 16px;color:var(--text);text-decoration:none}.guild-row:hover{border-color:var(--accent)}.guild-row small{color:var(--muted)}.editor,.settings{display:grid;gap:12px;margin-bottom:24px}.editor textarea{width:100%;min-height:220px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:12px;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}.settings label{display:grid;gap:6px;color:var(--muted)}select,input[type=text]{min-width:160px;max-width:100%;border:1px solid var(--line);border-radius:6px;background:#fff;padding:8px 10px;font:inherit}input[type=checkbox]{width:16px;height:16px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.cards{display:grid;gap:12px}.card{border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:12px}.card h2{font-size:18px;margin:0}.card p{margin:4px 0 0;color:var(--muted)}pre{margin:0;max-height:220px;overflow:auto;background:#101820;color:#eef6ff;border-radius:6px;padding:12px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}.row-actions{display:flex;gap:8px;align-items:center}.row-actions a{color:var(--accent);text-decoration:none;padding:8px 0}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid var(--line);padding:11px 8px;vertical-align:middle}th{font-size:13px;color:var(--muted);font-weight:600}.inline{display:inline-flex;align-items:center;gap:8px;margin-right:8px}.empty{color:var(--muted);padding:18px 0}details{border:1px solid var(--line);border-radius:8px;background:#fff}summary{cursor:pointer;padding:10px 12px;color:var(--muted)}details textarea{border:0;border-top:1px solid var(--line);border-radius:0 0 8px 8px}.filter-builder{display:grid;gap:12px;border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:14px}.builder-head,.group-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.builder-groups{display:grid;gap:12px}.filter-group{border:1px solid var(--line);background:#fff;border-radius:8px;padding:12px;display:grid;gap:10px}.filter-group h3{font-size:14px;margin:0;color:var(--muted);font-weight:600}.rule-list{display:grid;gap:8px}.filter-rule{display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) minmax(120px,1fr) minmax(180px,2fr) auto auto;gap:8px;align-items:end;border:1px solid #e8edf4;background:#fff;border-radius:6px;padding:10px}.filter-rule label{display:grid;gap:4px;color:var(--muted);font-size:12px}.check-label{display:flex!important;align-items:center;gap:6px;min-height:38px}.tag-mode-wrap.is-hidden{visibility:hidden}.rule-footer{display:flex;justify-content:flex-end}@media(max-width:860px){.filter-rule{grid-template-columns:1fr 1fr}.filter-rule .rule-footer{justify-content:flex-start}}@media(max-width:720px){header{padding:0 14px}main{padding:18px 12px}.panel{padding:16px}.guild-row,td,th{display:block}.toolbar,.inline{display:flex;width:100%}select,.toolbar button,.inline button{width:100%}table,thead,tbody,tr{display:block}thead{display:none}tr{border-bottom:1px solid var(--line);padding:10px 0}td{border:0;padding:6px 0}.builder-head,.group-head{align-items:flex-start;flex-direction:column}.filter-rule{grid-template-columns:1fr}select,input[type=text]{width:100%}}
+"#;
+
+const JS: &str = r#"
+(function(){
+  const fields = ['tags','name','description','category'];
+  const ops = ['include','exclude'];
+  const patternTypes = ['text','regex'];
+  const tagModes = ['any','all'];
+
+  function option(value, selected){
+    return `<option value="${value}"${value === selected ? ' selected' : ''}>${label(value)}</option>`;
+  }
+  function label(value){
+    return value.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+  }
+  function defaultRule(){
+    return {field:'tags',op:'include',pattern:{type:'text',value:''},case_sensitive:false,tag_mode:'any'};
+  }
+  function defaultFilter(){
+    return {groups:[{rules:[defaultRule()]}],schema_version:1};
+  }
+  function normalizeFilter(filter){
+    if (!filter || !Array.isArray(filter.groups) || filter.groups.length === 0) return defaultFilter();
+    filter.schema_version = filter.schema_version || 1;
+    filter.groups = filter.groups.map((group) => ({rules:(Array.isArray(group.rules) && group.rules.length ? group.rules : [defaultRule()]).map(normalizeRule)}));
+    return filter;
+  }
+  function normalizeRule(rule){
+    const next = Object.assign(defaultRule(), rule || {});
+    next.pattern = Object.assign({type:'text',value:''}, next.pattern || {});
+    if (!fields.includes(next.field)) next.field = 'tags';
+    if (!ops.includes(next.op)) next.op = 'include';
+    if (!patternTypes.includes(next.pattern.type)) next.pattern.type = 'text';
+    if (next.field === 'tags' && !tagModes.includes(next.tag_mode)) next.tag_mode = 'any';
+    return next;
+  }
+  function readRule(node){
+    const field = node.querySelector('[data-name="field"]').value;
+    const rule = {
+      field,
+      op: node.querySelector('[data-name="op"]').value,
+      pattern: {
+        type: node.querySelector('[data-name="pattern_type"]').value,
+        value: node.querySelector('[data-name="pattern_value"]').value
+      },
+      case_sensitive: node.querySelector('[data-name="case_sensitive"]').checked
+    };
+    if (field === 'tags') rule.tag_mode = node.querySelector('[data-name="tag_mode"]').value;
+    return rule;
+  }
+  function readFilter(builder){
+    const groups = Array.from(builder.querySelectorAll('.filter-group')).map((group) => ({
+      rules: Array.from(group.querySelectorAll('.filter-rule')).map(readRule)
+    })).filter((group) => group.rules.length > 0);
+    return {groups: groups.length ? groups : [{rules:[defaultRule()]}], schema_version: 1};
+  }
+  function yamlScalar(value){
+    const text = String(value || '');
+    if (/^[A-Za-z0-9 _.,:+#@/-]+$/.test(text) && text.trim() === text && text !== '') return text;
+    return JSON.stringify(text);
+  }
+  function toYaml(filter){
+    let yaml = 'groups:\n';
+    filter.groups.forEach((group) => {
+      yaml += '- rules:\n';
+      group.rules.forEach((rule) => {
+        yaml += `  - field: ${rule.field}\n`;
+        yaml += `    op: ${rule.op}\n`;
+        yaml += '    pattern:\n';
+        yaml += `      type: ${rule.pattern.type}\n`;
+        yaml += `      value: ${yamlScalar(rule.pattern.value)}\n`;
+        yaml += `    case_sensitive: ${rule.case_sensitive ? 'true' : 'false'}\n`;
+        if (rule.field === 'tags') yaml += `    tag_mode: ${rule.tag_mode || 'any'}\n`;
+      });
+    });
+    yaml += 'schema_version: 1\n';
+    return yaml;
+  }
+  function syncYaml(builder){
+    const form = document.getElementById(builder.dataset.form);
+    if (!form) return;
+    const textarea = form.querySelector('textarea[name="rule_yaml"]');
+    if (textarea) textarea.value = toYaml(readFilter(builder));
+  }
+  function renderRule(rule, groupIndex, ruleIndex){
+    rule = normalizeRule(rule);
+    const tagHidden = rule.field === 'tags' ? '' : ' is-hidden';
+    return `<div class="filter-rule" data-rule-index="${ruleIndex}">
+      <label>Field<select data-name="field">${fields.map((value) => option(value, rule.field)).join('')}</select></label>
+      <label>Operation<select data-name="op">${ops.map((value) => option(value, rule.op)).join('')}</select></label>
+      <label>Match<select data-name="pattern_type">${patternTypes.map((value) => option(value, rule.pattern.type)).join('')}</select></label>
+      <label>Value<input data-name="pattern_value" type="text" value="${escapeAttr(rule.pattern.value || '')}"></label>
+      <label class="check-label"><input data-name="case_sensitive" type="checkbox"${rule.case_sensitive ? ' checked' : ''}> Case</label>
+      <label class="tag-mode-wrap${tagHidden}">Tags<select data-name="tag_mode">${tagModes.map((value) => option(value, rule.tag_mode || 'any')).join('')}</select></label>
+      <div class="rule-footer"><button type="button" class="danger" data-action="remove-rule">Remove</button></div>
+    </div>`;
+  }
+  function render(builder, filter){
+    filter = normalizeFilter(filter);
+    const root = builder.querySelector('.builder-groups');
+    root.innerHTML = filter.groups.map((group, groupIndex) => `
+      <div class="filter-group" data-group-index="${groupIndex}">
+        <div class="group-head"><h3>AND group ${groupIndex + 1}</h3><div class="row-actions"><button type="button" data-action="add-rule">Add OR rule</button><button type="button" class="danger" data-action="remove-group">Remove group</button></div></div>
+        <div class="rule-list">${group.rules.map((rule, ruleIndex) => renderRule(rule, groupIndex, ruleIndex)).join('')}</div>
+      </div>`).join('');
+    syncYaml(builder);
+  }
+  function escapeAttr(value){
+    return String(value).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function attach(builder){
+    let filter = normalizeFilter(JSON.parse(builder.querySelector('.filter-data').textContent));
+    render(builder, filter);
+    builder.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const action = button.dataset.action;
+      filter = readFilter(builder);
+      const groupNode = button.closest('.filter-group');
+      const ruleNode = button.closest('.filter-rule');
+      const groupIndex = groupNode ? Number(groupNode.dataset.groupIndex) : -1;
+      const ruleIndex = ruleNode ? Number(ruleNode.dataset.ruleIndex) : -1;
+      if (action === 'add-group') filter.groups.push({rules:[defaultRule()]});
+      if (action === 'remove-group' && filter.groups.length > 1) filter.groups.splice(groupIndex, 1);
+      if (action === 'add-rule' && groupIndex >= 0) filter.groups[groupIndex].rules.push(defaultRule());
+      if (action === 'remove-rule' && groupIndex >= 0 && ruleIndex >= 0 && filter.groups[groupIndex].rules.length > 1) filter.groups[groupIndex].rules.splice(ruleIndex, 1);
+      render(builder, filter);
+    });
+    builder.addEventListener('input', () => syncYaml(builder));
+    builder.addEventListener('change', (event) => {
+      const rule = event.target.closest('.filter-rule');
+      if (rule && event.target.dataset.name === 'field') {
+        rule.querySelector('.tag-mode-wrap').classList.toggle('is-hidden', event.target.value !== 'tags');
+      }
+      syncYaml(builder);
+    });
+    const form = document.getElementById(builder.dataset.form);
+    if (form) form.addEventListener('submit', () => syncYaml(builder));
+  }
+  document.querySelectorAll('.filter-builder').forEach(attach);
+})();
 "#;
