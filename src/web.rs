@@ -1066,6 +1066,7 @@ const JS: &str = r#"
   }
   function yamlScalar(value){
     const text = String(value || '');
+    if (/^(?:[-+]?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?|true|false|null|~)$/i.test(text)) return JSON.stringify(text);
     if (/^[A-Za-z0-9 _.,:+#@/-]+$/.test(text) && text.trim() === text && text !== '') return text;
     return JSON.stringify(text);
   }
