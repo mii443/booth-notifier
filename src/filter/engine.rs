@@ -91,7 +91,7 @@ impl FilteringEngine {
         let tag_mode = rule.tag_mode.unwrap_or(TagMode::Any);
 
         if tags.is_empty() {
-            return true;
+            return false;
         }
 
         if tag_mode == TagMode::Any {
@@ -537,6 +537,33 @@ mod tests {
         assert!(engine.check(&item));
 
         item.name = "hoge".to_string();
+        assert!(!engine.check(&item));
+    }
+
+    #[test]
+    fn test_tag_include_does_not_match_empty_tags() {
+        let filter = Filter {
+            groups: vec![FilterGroup {
+                rules: vec![Rule {
+                    field: Field::Tags,
+                    op: Op::Include,
+                    pattern: Pattern::Text {
+                        value: "VRChat".to_string(),
+                    },
+                    case_sensitive: false,
+                    regex_flags: None,
+                    tag_mode: Some(TagMode::Any),
+                }],
+            }],
+            schema_version: 1,
+        };
+
+        let engine = FilteringEngine::new(filter);
+        let item = BoothItem {
+            tags: vec![],
+            ..Default::default()
+        };
+
         assert!(!engine.check(&item));
     }
 }
